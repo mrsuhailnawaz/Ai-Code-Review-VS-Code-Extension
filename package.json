@@ -1,0 +1,120 @@
+{
+  "name": "ai-code-reviewer",
+  "displayName": "AI Code Review Assistant",
+  "description": "AI-powered code review assistant for VS Code.",
+  "version": "0.1.0",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:ai-code-reviewer.reviewFile",
+    "onCommand:ai-code-reviewer.reviewSelection",
+    "onCommand:ai-code-reviewer.reviewChanges",
+    "onCommand:ai-code-reviewer.clearReviews",
+    "onCommand:ai-code-reviewer.configure"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-code-reviewer.reviewFile",
+        "title": "AI Code Review: Review Current File"
+      },
+      {
+        "command": "ai-code-reviewer.reviewSelection",
+        "title": "AI Code Review: Review Selection"
+      },
+      {
+        "command": "ai-code-reviewer.reviewChanges",
+        "title": "AI Code Review: Review Git Changes"
+      },
+      {
+        "command": "ai-code-reviewer.clearReviews",
+        "title": "AI Code Review: Clear Reviews"
+      },
+      {
+        "command": "ai-code-reviewer.configure",
+        "title": "AI Code Review: Configure"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiCodeReviewer",
+          "title": "AI Code Review",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "aiCodeReviewer": [
+        {
+          "id": "aiCodeReviewer.reviewResults",
+          "name": "Review Results"
+        },
+        {
+          "id": "aiCodeReviewer.reviewHistory",
+          "name": "Review History"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Code Reviewer",
+      "properties": {
+        "aiCodeReviewer.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API key used for AI reviews."
+        },
+        "aiCodeReviewer.model": {
+          "type": "string",
+          "default": "claude-3-5-sonnet-20240620",
+          "description": "Anthropic model to use for review requests."
+        },
+        "aiCodeReviewer.maxIssues": {
+          "type": "number",
+          "default": 25,
+          "minimum": 1,
+          "description": "Maximum number of issues returned per review."
+        },
+        "aiCodeReviewer.reviewOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically review files when saving."
+        },
+        "aiCodeReviewer.excludePatterns": {
+          "type": "array",
+          "default": [
+            "**/node_modules/**",
+            "**/dist/**"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns to exclude from reviews."
+        },
+        "aiCodeReviewer.useLocalFallback": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run local heuristics if the AI review fails."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "echo \"No lint configured\"",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.5"
+  }
+}

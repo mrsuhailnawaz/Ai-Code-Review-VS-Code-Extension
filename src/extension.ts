@@ -4,10 +4,13 @@ import { ReviewProvider } from './providers/reviewProvider';
 import { HistoryProvider } from './providers/historyProvider';
 import { DiagnosticsManager } from './managers/diagnosticsManager';
 import { GitManager } from './managers/gitManager';
+import { ReviewResult } from './types/reviewTypes';
 
 let reviewService: AIReviewService;
 let diagnosticsManager: DiagnosticsManager;
 let gitManager: GitManager;
+let reviewProvider: ReviewProvider;
+let historyProvider: HistoryProvider;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('AI Code Review Assistant is now active!');
@@ -18,8 +21,8 @@ export function activate(context: vscode.ExtensionContext) {
     gitManager = new GitManager();
 
     // Register providers
-    const reviewProvider = new ReviewProvider(context, reviewService);
-    const historyProvider = new HistoryProvider(context);
+    reviewProvider = new ReviewProvider();
+    historyProvider = new HistoryProvider(context);
 
     // Register tree views
     vscode.window.registerTreeDataProvider('aiCodeReviewer.reviewResults', reviewProvider);
@@ -47,7 +50,8 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('ai-code-reviewer.clearReviews', () => {
             diagnosticsManager.clear();
-            reviewProvider.refresh();
+            reviewProvider.clear();
+            historyProvider.clear();
             vscode.window.showInformationMessage('All reviews cleared!');
         })
     );
@@ -102,7 +106,7 @@ async function reviewSelection() {
 async function reviewGitChanges() {
     try {
         const changes = await gitManager.getUnstagedChanges();
-        
+
         if (changes.length === 0) {
             vscode.window.showInformationMessage('No unstaged changes found');
             return;
@@ -129,7 +133,7 @@ async function reviewDocument(document: vscode.TextDocument) {
     // Check if file should be excluded
     const config = vscode.workspace.getConfiguration('aiCodeReviewer');
     const excludePatterns = config.get<string[]>('excludePatterns', []);
-    
+
     const relativePath = vscode.workspace.asRelativePath(document.uri);
     for (const pattern of excludePatterns) {
         if (minimatch(relativePath, pattern)) {
@@ -163,27 +167,9 @@ async function reviewCode(
                 return;
             }
 
-            // Clear previous diagnostics for this file
-            diagnosticsManager.clearForFile(document.uri);
-
-            // Add new diagnostics
-            const diagnostics = review.issues.map(issue => {
-                const line = Math.max(0, Math.min(issue.line - 1, document.lineCount - 1));
-                const range = new vscode.Range(line, 0, line, Number.MAX_VALUE);
-                
-                const diagnostic = new vscode.Diagnostic(
-                    range,
-                    issue.message,
-                    getSeverity(issue.severity)
-                );
-                
-                diagnostic.source = 'AI Code Review';
-                diagnostic.code = issue.category;
-                
-                return diagnostic;
-            });
-
-            diagnosticsManager.set(document.uri, diagnostics);
+            applyDiagnostics(document, review);
+            reviewProvider.setReview(document.uri, review);
+            historyProvider.addReview(document.uri, review);
 
             // Show summary
             const issueCount = review.issues.length;
@@ -198,6 +184,29 @@ async function reviewCode(
     } catch (error: any) {
         vscode.window.showErrorMessage(`Review failed: ${error.message}`);
     }
+}
+
+function applyDiagnostics(document: vscode.TextDocument, review: ReviewResult) {
+    // Clear previous diagnostics for this file
+    diagnosticsManager.clearForFile(document.uri);
+
+    const diagnostics = review.issues.map(issue => {
+        const line = Math.max(0, Math.min(issue.line - 1, document.lineCount - 1));
+        const range = new vscode.Range(line, 0, line, Number.MAX_VALUE);
+
+        const diagnostic = new vscode.Diagnostic(
+            range,
+            issue.message,
+            getSeverity(issue.severity)
+        );
+
+        diagnostic.source = 'AI Code Review';
+        diagnostic.code = issue.category;
+
+        return diagnostic;
+    });
+
+    diagnosticsManager.set(document.uri, diagnostics);
 }
 
 function getSeverity(severity: string): vscode.DiagnosticSeverity {
@@ -235,7 +244,7 @@ async function configureExtension() {
 
 function showWelcomeMessage(context: vscode.ExtensionContext) {
     const hasShownWelcome = context.globalState.get('hasShownWelcome', false);
-    
+
     if (!hasShownWelcome) {
         const config = vscode.workspace.getConfiguration('aiCodeReviewer');
         const apiKey = config.get<string>('apiKey');
@@ -262,7 +271,7 @@ function minimatch(path: string, pattern: string): boolean {
         .replace(/\*\*/g, '.*')
         .replace(/\*/g, '[^/]*')
         .replace(/\?/g, '.');
-    
+
     const regex = new RegExp(`^${regexPattern}$`);
     return regex.test(path);
 }
